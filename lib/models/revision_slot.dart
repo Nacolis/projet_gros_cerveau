@@ -1,12 +1,7 @@
 enum RevisionType {
-  firstSeen('Première vue'),
-  groupRevision('Révision de groupe'),
-  revision1('Révision 1'),
-  revision2Qcm('Révision 2 QCM'),
-  revision3('Révision 3'),
-  revision4('Révision 4'),
-  revision5('Révision 5'),
-  revision6('Révision 6');
+  lecture('Lecture'),
+  qcm('QCM'),
+  dossier('Dossier');
 
   const RevisionType(this.label);
   final String label;
@@ -14,7 +9,7 @@ enum RevisionType {
   static RevisionType fromString(String value) {
     return RevisionType.values.firstWhere(
       (e) => e.name == value,
-      orElse: () => RevisionType.firstSeen,
+      orElse: () => RevisionType.lecture,
     );
   }
 }
@@ -28,6 +23,7 @@ class RevisionSlot {
   final DateTime scheduledEndTime;
   final bool isCompleted;
   final DateTime? completedDate;
+  final String? notes;
 
   RevisionSlot({
     this.id,
@@ -38,6 +34,7 @@ class RevisionSlot {
     required this.scheduledEndTime,
     this.isCompleted = false,
     this.completedDate,
+    this.notes,
   });
 
   Duration get duration {
@@ -54,6 +51,7 @@ class RevisionSlot {
       'scheduled_end_time': scheduledEndTime.toIso8601String(),
       'is_completed': isCompleted ? 1 : 0,
       'completed_date': completedDate?.toIso8601String(),
+      'notes': notes,
     };
   }
 
@@ -69,6 +67,7 @@ class RevisionSlot {
       completedDate: map['completed_date'] != null
           ? DateTime.parse(map['completed_date'] as String)
           : null,
+      notes: map['notes'] as String?,
     );
   }
 
@@ -81,6 +80,7 @@ class RevisionSlot {
     DateTime? scheduledEndTime,
     bool? isCompleted,
     DateTime? completedDate,
+    String? notes,
   }) {
     return RevisionSlot(
       id: id ?? this.id,
@@ -91,6 +91,7 @@ class RevisionSlot {
       scheduledEndTime: scheduledEndTime ?? this.scheduledEndTime,
       isCompleted: isCompleted ?? this.isCompleted,
       completedDate: completedDate ?? this.completedDate,
+      notes: notes ?? this.notes,
     );
   }
 }

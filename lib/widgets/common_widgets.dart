@@ -381,59 +381,6 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// A difficulty badge
-class DifficultyBadge extends StatelessWidget {
-  final String difficulty;
-  final bool compact;
-
-  const DifficultyBadge({
-    super.key,
-    required this.difficulty,
-    this.compact = false,
-  });
-
-  String get _label {
-    switch (difficulty) {
-      case 'easy':
-        return 'Facile';
-      case 'medium':
-        return 'Moyen';
-      case 'hard':
-        return 'Difficile';
-      default:
-        return difficulty;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = AppTheme.getDifficultyColor(difficulty);
-    
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 8 : 10,
-        vertical: compact ? 4 : 5,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Text(
-        _label,
-        style: GoogleFonts.poppins(
-          fontSize: compact ? 11 : 12,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
-    );
-  }
-}
-
 /// A revision type badge
 class RevisionTypeBadge extends StatelessWidget {
   final String revisionType;

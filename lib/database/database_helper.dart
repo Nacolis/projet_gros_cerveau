@@ -8,8 +8,6 @@ import '../models/item.dart';
 import '../models/item_college.dart';
 import '../models/revision_slot.dart';
 import '../models/work_schedule.dart';
-import '../models/difficulty.dart';
-import '../models/difficulty_config.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -56,16 +54,12 @@ class DatabaseHelper {
       )
     ''');
 
-    // ItemCollege table (relationship between items and colleges with user data)
+    // ItemCollege table (relationship between items and colleges)
     await db.execute('''
       CREATE TABLE item_colleges (
         id $idType,
         item_id $integerType,
         college_id $integerType,
-        difficulty $textType,
-        first_seen_date TEXT,
-        needs_group_revision INTEGER NOT NULL DEFAULT 0,
-        group_revision_date TEXT,
         FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE CASCADE,
         FOREIGN KEY (college_id) REFERENCES colleges (id) ON DELETE CASCADE
       )
@@ -82,6 +76,7 @@ class DatabaseHelper {
         scheduled_end_time TEXT NOT NULL,
         is_completed INTEGER NOT NULL DEFAULT 0,
         completed_date TEXT,
+        notes TEXT,
         FOREIGN KEY (item_college_id) REFERENCES item_colleges (id) ON DELETE CASCADE
       )
     ''');
@@ -98,27 +93,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // DifficultyConfig table
-    await db.execute('''
-      CREATE TABLE difficulty_configs (
-        id $idType,
-        difficulty $textType UNIQUE,
-        first_seen_duration_minutes $integerType
-      )
-    ''');
-
-    // RevisionSlotConfig table
-    await db.execute('''
-      CREATE TABLE revision_slot_configs (
-        id $idType,
-        difficulty_config_id $integerType,
-        slot_order $integerType,
-        days_after_first_seen $integerType,
-        duration_minutes $integerType,
-        FOREIGN KEY (difficulty_config_id) REFERENCES difficulty_configs (id) ON DELETE CASCADE
-      )
-    ''');
-
     // Create default work schedule (7 days, 14h-22h)
     for (int day = 1; day <= 7; day++) {
       await db.insert('work_schedules', {
@@ -128,21 +102,6 @@ class DatabaseHelper {
         'end_hour': 22,
         'end_minute': 0,
       });
-    }
-
-    // Create default difficulty configurations
-    await _createDefaultDifficultyConfigs(db);
-  }
-
-  Future<void> _createDefaultDifficultyConfigs(Database db) async {
-    for (final difficulty in Difficulty.values) {
-      final defaultConfig = DifficultyConfig.getDefault(difficulty);
-      final configId = await db.insert('difficulty_configs', defaultConfig.toMap());
-      
-      final defaultSlots = DifficultyConfig.getDefaultRevisionSlots(configId, difficulty);
-      for (final slot in defaultSlots) {
-        await db.insert('revision_slot_configs', slot.copyWith(difficultyConfigId: configId).toMap());
-      }
     }
   }
 
@@ -276,11 +235,7 @@ class DatabaseHelper {
         i.item_number,
         i.name as item_name,
         c.id as college_id,
-        c.name as college_name,
-        ic.difficulty,
-        ic.first_seen_date,
-        ic.needs_group_revision,
-        ic.group_revision_date
+        c.name as college_name
       FROM item_colleges ic
       INNER JOIN items i ON ic.item_id = i.id
       INNER JOIN colleges c ON ic.college_id = c.id
@@ -308,21 +263,16 @@ class DatabaseHelper {
         SELECT 
           ic.id as item_college_id,
           c.id as college_id,
-          c.name as college_name,
-          ic.difficulty,
-          ic.first_seen_date,
-          ic.needs_group_revision,
-          ic.group_revision_date
+          c.name as college_name
         FROM item_colleges ic
         INNER JOIN colleges c ON ic.college_id = c.id
         WHERE ic.item_id = ?
         ORDER BY c.name
       ''', [item['id']]);
       
-      // Check if any college has been seen
-      final hasSeenAny = colleges.any((c) => c['first_seen_date'] != null);
-      final allSeen = colleges.isNotEmpty && colleges.every((c) => c['first_seen_date'] != null);
-      final seenCount = colleges.where((c) => c['first_seen_date'] != null).length;
+      // Get revision count for this item
+      final revisionCount = await _getRevisionCountForItem(item['id'] as int);
+      final completedCount = await _getCompletedRevisionCountForItem(item['id'] as int);
       
       groupedItems.add({
         'item_id': item['id'],
@@ -330,13 +280,34 @@ class DatabaseHelper {
         'item_name': item['name'],
         'colleges': colleges,
         'college_count': colleges.length,
-        'seen_count': seenCount,
-        'has_seen_any': hasSeenAny,
-        'all_seen': allSeen,
+        'revision_count': revisionCount,
+        'completed_count': completedCount,
       });
     }
     
     return groupedItems;
+  }
+
+  Future<int> _getRevisionCountForItem(int itemId) async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT COUNT(*) as count
+      FROM revision_slots rs
+      INNER JOIN item_colleges ic ON rs.item_college_id = ic.id
+      WHERE ic.item_id = ?
+    ''', [itemId]);
+    return result.first['count'] as int;
+  }
+
+  Future<int> _getCompletedRevisionCountForItem(int itemId) async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT COUNT(*) as count
+      FROM revision_slots rs
+      INNER JOIN item_colleges ic ON rs.item_college_id = ic.id
+      WHERE ic.item_id = ? AND rs.is_completed = 1
+    ''', [itemId]);
+    return result.first['count'] as int;
   }
 
   /// Search items by number or name
@@ -394,20 +365,15 @@ class DatabaseHelper {
         SELECT 
           ic.id as item_college_id,
           c.id as college_id,
-          c.name as college_name,
-          ic.difficulty,
-          ic.first_seen_date,
-          ic.needs_group_revision,
-          ic.group_revision_date
+          c.name as college_name
         FROM item_colleges ic
         INNER JOIN colleges c ON ic.college_id = c.id
         WHERE $collegeWhere
         ORDER BY c.name
       ''', collegeArgs);
       
-      final hasSeenAny = colleges.any((c) => c['first_seen_date'] != null);
-      final allSeen = colleges.isNotEmpty && colleges.every((c) => c['first_seen_date'] != null);
-      final seenCount = colleges.where((c) => c['first_seen_date'] != null).length;
+      final revisionCount = await _getRevisionCountForItem(item['item_id'] as int);
+      final completedCount = await _getCompletedRevisionCountForItem(item['item_id'] as int);
       
       groupedItems.add({
         'item_id': item['item_id'],
@@ -415,9 +381,8 @@ class DatabaseHelper {
         'item_name': item['item_name'],
         'colleges': colleges,
         'college_count': colleges.length,
-        'seen_count': seenCount,
-        'has_seen_any': hasSeenAny,
-        'all_seen': allSeen,
+        'revision_count': revisionCount,
+        'completed_count': completedCount,
       });
     }
     
@@ -499,10 +464,10 @@ class DatabaseHelper {
     final result = await db.rawQuery('''
       SELECT 
         rs.*,
+        i.id as item_id,
         i.item_number,
         i.name as item_name,
-        c.name as college_name,
-        ic.difficulty
+        c.name as college_name
       FROM revision_slots rs
       INNER JOIN item_colleges ic ON rs.item_college_id = ic.id
       INNER JOIN items i ON ic.item_id = i.id
@@ -558,17 +523,17 @@ class DatabaseHelper {
     return result.map((json) => RevisionSlot.fromMap(json)).toList();
   }
 
-  // Delete all non-completed revisions for an item-college (except first seen)
+  // Delete all non-completed revisions for an item-college
   Future<int> deleteNonCompletedRevisionsForItemCollege(int itemCollegeId) async {
     final db = await database;
     return await db.delete(
       'revision_slots',
-      where: 'item_college_id = ? AND is_completed = 0 AND revision_type != ?',
-      whereArgs: [itemCollegeId, RevisionType.firstSeen.name],
+      where: 'item_college_id = ? AND is_completed = 0',
+      whereArgs: [itemCollegeId],
     );
   }
 
-  // Get revision slots with details in date range (with first seen info for priority)
+  // Get revision slots with details in date range
   Future<List<Map<String, dynamic>>> getRevisionSlotsWithDetailsInRange(DateTime startDate, DateTime endDate) async {
     final db = await database;
     final startStr = DateTime(startDate.year, startDate.month, startDate.day).toIso8601String();
@@ -577,11 +542,10 @@ class DatabaseHelper {
     final result = await db.rawQuery('''
       SELECT 
         rs.*,
+        i.id as item_id,
         i.item_number,
         i.name as item_name,
-        c.name as college_name,
-        ic.difficulty,
-        ic.first_seen_date
+        c.name as college_name
       FROM revision_slots rs
       INNER JOIN item_colleges ic ON rs.item_college_id = ic.id
       INNER JOIN items i ON ic.item_id = i.id
@@ -590,6 +554,60 @@ class DatabaseHelper {
       ORDER BY rs.scheduled_date ASC, rs.scheduled_start_time ASC
     ''', [startStr, endStr]);
     return result;
+  }
+
+  // Get revision slots for an item with details
+  Future<List<Map<String, dynamic>>> getRevisionSlotsForItemWithDetails(int itemId) async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT 
+        rs.*,
+        i.id as item_id,
+        i.item_number,
+        i.name as item_name,
+        c.name as college_name,
+        c.id as college_id
+      FROM revision_slots rs
+      INNER JOIN item_colleges ic ON rs.item_college_id = ic.id
+      INNER JOIN items i ON ic.item_id = i.id
+      INNER JOIN colleges c ON ic.college_id = c.id
+      WHERE i.id = ?
+      ORDER BY rs.scheduled_date ASC, rs.scheduled_start_time ASC
+    ''', [itemId]);
+    return result;
+  }
+
+  // Get item details with colleges
+  Future<Map<String, dynamic>?> getItemWithColleges(int itemId) async {
+    final db = await database;
+    
+    final itemResult = await db.query(
+      'items',
+      where: 'id = ?',
+      whereArgs: [itemId],
+    );
+    
+    if (itemResult.isEmpty) return null;
+    
+    final item = itemResult.first;
+    
+    final colleges = await db.rawQuery('''
+      SELECT 
+        ic.id as item_college_id,
+        c.id as college_id,
+        c.name as college_name
+      FROM item_colleges ic
+      INNER JOIN colleges c ON ic.college_id = c.id
+      WHERE ic.item_id = ?
+      ORDER BY c.name
+    ''', [itemId]);
+    
+    return {
+      'item_id': item['id'],
+      'item_number': item['item_number'],
+      'item_name': item['name'],
+      'colleges': colleges,
+    };
   }
 
   // Get conflicting slots for a time range
@@ -735,7 +753,6 @@ class DatabaseHelper {
             await createItemCollege(ItemCollege(
               itemId: item.id!,
               collegeId: college.id!,
-              difficulty: Difficulty.medium,
             ));
           }
         }
@@ -744,121 +761,6 @@ class DatabaseHelper {
       print('Error importing CSV: $e');
       rethrow;
     }
-  }
-
-  // DifficultyConfig CRUD
-  Future<DifficultyConfig?> readDifficultyConfig(Difficulty difficulty) async {
-    final db = await database;
-    final maps = await db.query(
-      'difficulty_configs',
-      where: 'difficulty = ?',
-      whereArgs: [difficulty.name],
-    );
-
-    if (maps.isNotEmpty) {
-      final configId = maps.first['id'] as int;
-      final slots = await readRevisionSlotConfigsForDifficulty(configId);
-      return DifficultyConfig.fromMap(maps.first, slots);
-    }
-    return null;
-  }
-
-  Future<List<DifficultyConfig>> readAllDifficultyConfigs() async {
-    final db = await database;
-    final result = await db.query('difficulty_configs');
-    
-    final List<DifficultyConfig> configs = [];
-    for (final map in result) {
-      final configId = map['id'] as int;
-      final slots = await readRevisionSlotConfigsForDifficulty(configId);
-      configs.add(DifficultyConfig.fromMap(map, slots));
-    }
-    return configs;
-  }
-
-  Future<int> updateDifficultyConfig(DifficultyConfig config) async {
-    final db = await database;
-    return db.update(
-      'difficulty_configs',
-      config.toMap(),
-      where: 'id = ?',
-      whereArgs: [config.id],
-    );
-  }
-
-  // RevisionSlotConfig CRUD
-  Future<List<RevisionSlotConfig>> readRevisionSlotConfigsForDifficulty(int difficultyConfigId) async {
-    final db = await database;
-    final result = await db.query(
-      'revision_slot_configs',
-      where: 'difficulty_config_id = ?',
-      whereArgs: [difficultyConfigId],
-      orderBy: 'slot_order ASC',
-    );
-    return result.map((json) => RevisionSlotConfig.fromMap(json)).toList();
-  }
-
-  Future<RevisionSlotConfig> createRevisionSlotConfig(RevisionSlotConfig slot) async {
-    final db = await database;
-    final id = await db.insert('revision_slot_configs', slot.toMap());
-    return slot.copyWith(id: id);
-  }
-
-  Future<int> updateRevisionSlotConfig(RevisionSlotConfig slot) async {
-    final db = await database;
-    return db.update(
-      'revision_slot_configs',
-      slot.toMap(),
-      where: 'id = ?',
-      whereArgs: [slot.id],
-    );
-  }
-
-  Future<int> deleteRevisionSlotConfig(int id) async {
-    final db = await database;
-    return await db.delete(
-      'revision_slot_configs',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  Future<void> deleteAllRevisionSlotConfigsForDifficulty(int difficultyConfigId) async {
-    final db = await database;
-    await db.delete(
-      'revision_slot_configs',
-      where: 'difficulty_config_id = ?',
-      whereArgs: [difficultyConfigId],
-    );
-  }
-
-  Future<void> updateDifficultyConfigWithSlots(DifficultyConfig config, List<RevisionSlotConfig> slots) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      // Update the main config
-      await txn.update(
-        'difficulty_configs',
-        config.toMap(),
-        where: 'id = ?',
-        whereArgs: [config.id],
-      );
-
-      // Delete existing slots
-      await txn.delete(
-        'revision_slot_configs',
-        where: 'difficulty_config_id = ?',
-        whereArgs: [config.id],
-      );
-
-      // Insert new slots
-      for (int i = 0; i < slots.length; i++) {
-        final slot = slots[i].copyWith(
-          difficultyConfigId: config.id,
-          order: i + 1,
-        );
-        await txn.insert('revision_slot_configs', slot.toMap());
-      }
-    });
   }
 
   Future<Map<String, dynamic>> getDatabaseBackup() async {
@@ -871,8 +773,6 @@ class DatabaseHelper {
       'item_colleges',
       'revision_slots',
       'work_schedules',
-      'difficulty_configs',
-      'revision_slot_configs'
     ];
 
     for (final table in tables) {
@@ -890,11 +790,9 @@ class DatabaseHelper {
       // Order is important for foreign keys
       final tablesToClear = [
         'revision_slots',
-        'revision_slot_configs',
         'item_colleges',
         'items',
         'colleges',
-        'difficulty_configs',
         'work_schedules'
       ];
 
@@ -903,15 +801,12 @@ class DatabaseHelper {
       }
 
       // Restore data - handle dependencies implicitly by checking backup keys
-      // Ideally we insert independent tables first
       final tablesToRestore = [
         'colleges',
         'items',
         'work_schedules',
-        'difficulty_configs',
-        'item_colleges', // Depends on items, colleges
-        'revision_slot_configs', // Depends on difficulty_configs
-        'revision_slots' // Depends on item_colleges
+        'item_colleges',
+        'revision_slots'
       ];
 
       for (final table in tablesToRestore) {

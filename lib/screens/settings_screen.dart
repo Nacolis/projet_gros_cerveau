@@ -5,7 +5,6 @@ import '../models/work_schedule.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import 'data_management_screen.dart';
-import 'difficulty_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -100,11 +99,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         
         const SizedBox(height: 20),
         
-        // Difficulty settings card
-        _buildDifficultySettingsCard(),
-        
-        const SizedBox(height: 16),
-        
         // Data management card
         _buildDataManagementCard(),
         
@@ -148,7 +142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         
         // Tips section
         SectionHeader(
-          title: 'Conseils',
+          title: 'Notes',
           color: AppTheme.success,
         ),
         
@@ -163,80 +157,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           description: 'Les révisions sont automatiquement planifiées selon la méthode de répétition espacée',
         ),
       ],
-    );
-  }
-
-  Widget _buildDifficultySettingsCard() {
-    return Material(
-      color: AppTheme.backgroundCard,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const DifficultySettingsScreen(),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: AppTheme.cardShadow,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppTheme.warning, AppTheme.error],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.tune,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Configuration des difficultés',
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Personnalisez la durée des révisions par niveau',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: AppTheme.textMuted,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 

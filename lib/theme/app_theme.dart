@@ -339,37 +339,15 @@ class AppTheme {
     );
   }
 
-  // Difficulty colors - muted to match theme
-  static Color getDifficultyColor(String difficulty) {
-    switch (difficulty) {
-      case 'easy':
-        return success;
-      case 'medium':
-        return warning;
-      case 'hard':
-        return const Color(0xFFE07B85);
-      default:
-        return textMuted;
-    }
-  }
-
   // Revision type colors - harmonized with theme
   static Color getRevisionTypeColor(String type) {
     switch (type) {
-      case 'firstSeen':
-        return info;
-      case 'groupRevision':
-        return const Color(0xFF9B7CB5);
-      case 'revision1':
-        return const Color(0xFF6BADA6);
-      case 'revision2Qcm':
-        return warning;
-      case 'revision3':
-        return const Color(0xFF6BA3AD);
-      case 'revision4':
-        return success;
-      case 'revision5':
-        return primary;
+      case 'lecture':
+        return info;              // Blue for reading/learning
+      case 'qcm':
+        return warning;           // Orange for practice/testing
+      case 'dossier':
+        return const Color(0xFF9B7CB5);  // Purple for cases/dossiers
       default:
         return primaryLight;
     }

@@ -8,9 +8,7 @@ import '../theme/app_theme.dart';
 import '../services/revision_scheduler.dart';
 import '../widgets/common_widgets.dart';
 import '../utils/college_icons.dart';
-import 'add_first_seen_screen.dart';
-import 'plan_first_seen_screen.dart';
-import 'edit_slot_screen.dart';
+import 'item_detail_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -256,10 +254,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ? EmptyState(
                       icon: Icons.event_busy,
                       title: 'Aucune révision prévue',
-                      subtitle: 'Ajoutez un nouvel item vu ou planifiez une révision',
+                      subtitle: 'Sélectionnez un item pour planifier une révision',
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       itemCount: _revisionsForDay.length,
                       itemBuilder: (context, index) {
                         final rev = _revisionsForDay[index];
@@ -269,59 +267,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
             ),
           ],
-        ),
-        
-        // Floating action buttons
-        Positioned(
-          right: 16,
-          bottom: 16,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Plan future item button
-              FloatingActionButton.small(
-                heroTag: 'plan_future',
-                backgroundColor: AppTheme.surfaceLight,
-                foregroundColor: AppTheme.primary,
-                elevation: 2,
-                onPressed: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PlanFirstSeenScreen(
-                        initialDate: _selectedDate,
-                      ),
-                    ),
-                  );
-                  if (result == true) {
-                    _loadRevisionsForDay();
-                  }
-                },
-                child: const Icon(Icons.schedule),
-              ),
-              const SizedBox(height: 12),
-              // Add item seen now button
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: AppTheme.floatingShadow,
-                ),
-                child: FloatingActionButton(
-                  heroTag: 'add_now',
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AddFirstSeenScreen(),
-                      ),
-                    );
-                    _loadRevisionsForDay();
-                  },
-                  child: const Icon(Icons.add),
-                ),
-              ),
-            ],
-          ),
         ),
       ],
     );
@@ -758,33 +703,33 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     subtitle: '${revSlot.duration.inMinutes} minutes',
                   ),
                   
-                  const SizedBox(height: 16),
-
-                  // Difficulty
-                  _buildDetailRow(
-                    icon: Icons.signal_cellular_alt,
-                    label: 'Difficulté',
-                    value: rev['difficulty'] ?? 'Non définie',
-                    valueColor: AppTheme.getDifficultyColor(rev['difficulty'] ?? ''),
-                  ),
+                  // Notes if any
+                  if (revSlot.notes != null && revSlot.notes!.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _buildDetailRow(
+                      icon: Icons.notes,
+                      label: 'Notes',
+                      value: revSlot.notes!,
+                    ),
+                  ],
 
                   const SizedBox(height: 32),
 
                   // Actions
                   Row(
                     children: [
-                      if (!revSlot.isCompleted) ...[
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _navigateToEditScreen(rev, revSlot);
-                            },
-                            icon: const Icon(Icons.edit),
-                            label: const Text('Modifier'),
-                          ),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _navigateToItemDetail(rev);
+                          },
+                          icon: const Icon(Icons.open_in_new),
+                          label: const Text('Voir l\'item'),
                         ),
-                        const SizedBox(width: 12),
+                      ),
+                      const SizedBox(width: 12),
+                      if (!revSlot.isCompleted)
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () async {
@@ -794,12 +739,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             icon: const Icon(Icons.check),
                             label: const Text('Compléter'),
                           ),
-                        ),
-                      ] else
+                        )
+                      else
                         Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Fermer'),
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              await _unmarkCompleted(revSlot);
+                              Navigator.pop(context);
+                            },
+                            icon: const Icon(Icons.undo),
+                            label: const Text('Annuler'),
                           ),
                         ),
                     ],
@@ -866,19 +815,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  Future<void> _navigateToEditScreen(Map<String, dynamic> rev, RevisionSlot revSlot) async {
-    final result = await Navigator.push(
+  Future<void> _navigateToItemDetail(Map<String, dynamic> rev) async {
+    final itemId = rev['item_id'] as int?;
+    if (itemId == null) return;
+    
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EditSlotScreen(
-          slotData: rev,
-          slot: revSlot,
-        ),
+        builder: (context) => ItemDetailScreen(itemId: itemId),
       ),
     );
-    if (result == true) {
-      _loadRevisionsForDay();
-    }
+    _loadRevisionsForDay();
   }
 
   Future<void> _markAsCompleted(RevisionSlot slot) async {
@@ -895,6 +842,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
         SnackBar(
           content: const Text('Révision complétée !'),
           backgroundColor: AppTheme.success,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _unmarkCompleted(RevisionSlot slot) async {
+    await _db.updateRevisionSlot(
+      slot.copyWith(
+        isCompleted: false,
+        completedDate: null,
+      ),
+    );
+    _loadRevisionsForDay();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Révision non complétée'),
+          backgroundColor: AppTheme.info,
           duration: const Duration(seconds: 2),
         ),
       );
