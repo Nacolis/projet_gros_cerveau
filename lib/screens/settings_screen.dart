@@ -146,16 +146,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: AppTheme.success,
         ),
         
-        _buildTipCard(
-          icon: Icons.lightbulb_outline,
-          title: '2 premières heures',
-          description: 'Réservées pour voir de nouveaux items (si créneau ≥ 4h)',
-        ),
-        _buildTipCard(
-          icon: Icons.repeat,
-          title: 'Révisions espacées',
-          description: 'Les révisions sont automatiquement planifiées selon la méthode de répétition espacée',
-        ),
+
       ],
     );
   }

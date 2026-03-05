@@ -353,6 +353,26 @@ class AppTheme {
     }
   }
 
+  // Event type colors
+  static const Color eventExam = Color(0xFFE53935);          // Red for exams
+  static const Color eventWhiteExam = Color(0xFFFF9800);     // Orange for white exams
+  static const Color eventMasterclass = Color(0xFF9C27B0);   // Purple for masterclass
+  static const Color eventOther = Color(0xFF607D8B);         // Blue Grey for other
+
+  static Color getEventTypeColor(String type) {
+    switch (type) {
+      case 'exam':
+        return eventExam;
+      case 'white_exam':
+        return eventWhiteExam;
+      case 'masterclass':
+        return eventMasterclass;
+      case 'other':
+      default:
+        return eventOther;
+    }
+  }
+
   // Box shadow for elevated cards
   static List<BoxShadow> get cardShadow => [
     BoxShadow(

@@ -6,15 +6,12 @@ import '../models/revision_slot.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../utils/college_icons.dart';
-import 'add_revision_screen.dart';
+import 'add_calendar_entry_screen.dart';
 
 class ItemDetailScreen extends StatefulWidget {
   final int itemId;
 
-  const ItemDetailScreen({
-    super.key,
-    required this.itemId,
-  });
+  const ItemDetailScreen({super.key, required this.itemId});
 
   @override
   State<ItemDetailScreen> createState() => _ItemDetailScreenState();
@@ -34,10 +31,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    
+
     final itemData = await _db.getItemWithColleges(widget.itemId);
-    final revisions = await _db.getRevisionSlotsForItemWithDetails(widget.itemId);
-    
+    final revisions = await _db.getRevisionSlotsForItemWithDetails(
+      widget.itemId,
+    );
+
     setState(() {
       _itemData = itemData;
       _revisions = revisions;
@@ -50,7 +49,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundLight,
       appBar: AppBar(
-        title: Text(_isLoading ? 'Chargement...' : 'Item ${_itemData?['item_number'] ?? ''}'),
+        title: Text(
+          _isLoading
+              ? 'Chargement...'
+              : 'Item ${_itemData?['item_number'] ?? ''}',
+        ),
         actions: [
           if (!_isLoading && _itemData != null)
             IconButton(
@@ -63,14 +66,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _itemData == null
-              ? const Center(child: Text('Item non trouvé'))
-              : _buildContent(),
+          ? const Center(child: Text('Item non trouvé'))
+          : _buildContent(),
     );
   }
 
   Widget _buildContent() {
     final colleges = _itemData!['colleges'] as List<Map<String, dynamic>>;
-    
+
     return RefreshIndicator(
       onRefresh: _loadData,
       color: AppTheme.primary,
@@ -82,22 +85,22 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           children: [
             // Item header card
             _buildHeaderCard(),
-            
+
             const SizedBox(height: 16),
-            
+
             // Colleges section
             _buildCollegesSection(colleges),
-            
+
             const SizedBox(height: 24),
-            
+
             // Revisions section
             _buildRevisionsSection(),
-            
+
             const SizedBox(height: 24),
-            
+
             // Add revision button
             _buildAddRevisionButton(),
-            
+
             const SizedBox(height: 32),
           ],
         ),
@@ -153,7 +156,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
   Widget _buildCollegesSection(List<Map<String, dynamic>> colleges) {
     if (colleges.isEmpty) return const SizedBox.shrink();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -212,12 +215,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       final slot = RevisionSlot.fromMap(r);
       return slot.isCompleted;
     }).toList();
-    
+
     final upcomingRevisions = _revisions.where((r) {
       final slot = RevisionSlot.fromMap(r);
       return !slot.isCompleted;
     }).toList();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -234,7 +237,10 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             const Spacer(),
             if (_revisions.isNotEmpty)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -251,7 +257,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        
+
         if (_revisions.isEmpty)
           _buildEmptyRevisionsState()
         else ...[
@@ -259,11 +265,10 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           if (upcomingRevisions.isNotEmpty) ...[
             ...upcomingRevisions.map((rev) => _buildRevisionCard(rev)),
           ],
-          
+
           // Completed revisions (greyed out)
           if (completedRevisions.isNotEmpty) ...[
-            if (upcomingRevisions.isNotEmpty) 
-              const SizedBox(height: 16),
+            if (upcomingRevisions.isNotEmpty) const SizedBox(height: 16),
             Text(
               'Complétées',
               style: GoogleFonts.poppins(
@@ -273,7 +278,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            ...completedRevisions.map((rev) => _buildRevisionCard(rev, isCompleted: true)),
+            ...completedRevisions.map(
+              (rev) => _buildRevisionCard(rev, isCompleted: true),
+            ),
           ],
         ],
       ],
@@ -290,11 +297,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       ),
       child: Column(
         children: [
-          Icon(
-            Icons.event_note_outlined,
-            size: 48,
-            color: AppTheme.textMuted,
-          ),
+          Icon(Icons.event_note_outlined, size: 48, color: AppTheme.textMuted),
           const SizedBox(height: 12),
           Text(
             'Aucune révision planifiée',
@@ -307,31 +310,27 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           const SizedBox(height: 4),
           Text(
             'Ajoutez votre première révision',
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              color: AppTheme.textMuted,
-            ),
+            style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textMuted),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRevisionCard(Map<String, dynamic> rev, {bool isCompleted = false}) {
+  Widget _buildRevisionCard(
+    Map<String, dynamic> rev, {
+    bool isCompleted = false,
+  }) {
     final revSlot = RevisionSlot.fromMap(rev);
     final collegeName = rev['college_name'] as String? ?? '';
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isCompleted 
-            ? AppTheme.surfaceLight 
-            : AppTheme.backgroundCard,
+        color: isCompleted ? AppTheme.surfaceLight : AppTheme.backgroundCard,
         borderRadius: BorderRadius.circular(16),
         boxShadow: isCompleted ? null : AppTheme.cardShadow,
-        border: isCompleted 
-            ? Border.all(color: AppTheme.surfaceMedium) 
-            : null,
+        border: isCompleted ? Border.all(color: AppTheme.surfaceMedium) : null,
       ),
       child: Material(
         color: Colors.transparent,
@@ -347,9 +346,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   width: 56,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
-                    color: isCompleted 
+                    color: isCompleted
                         ? AppTheme.textMuted.withValues(alpha: 0.3)
-                        : AppTheme.getRevisionTypeColor(revSlot.revisionType.name),
+                        : AppTheme.getRevisionTypeColor(
+                            revSlot.revisionType.name,
+                          ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -359,25 +360,30 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         style: GoogleFonts.poppins(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
-                          color: isCompleted ? AppTheme.textMuted : Colors.white,
+                          color: isCompleted
+                              ? AppTheme.textMuted
+                              : Colors.white,
                         ),
                       ),
                       Text(
-                        DateFormat('MMM', 'fr_FR').format(revSlot.scheduledDate).toUpperCase(),
+                        DateFormat(
+                          'MMM',
+                          'fr_FR',
+                        ).format(revSlot.scheduledDate).toUpperCase(),
                         style: GoogleFonts.poppins(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: isCompleted 
-                              ? AppTheme.textMuted 
+                          color: isCompleted
+                              ? AppTheme.textMuted
                               : Colors.white.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(width: 14),
-                
+
                 // Content
                 Expanded(
                   child: Column(
@@ -391,27 +397,28 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             label: revSlot.revisionType.label,
                           ),
                           const SizedBox(width: 8),
-                          if (collegeName.isNotEmpty && revSlot.revisionType == RevisionType.lecture)
+                          if (collegeName.isNotEmpty &&
+                              revSlot.revisionType == RevisionType.lecture)
                             Expanded(
                               child: Row(
                                 children: [
                                   CollegeIcons.buildIcon(
                                     collegeName,
                                     size: 14,
-                                    color: isCompleted 
-                                        ? AppTheme.textMuted 
+                                    color: isCompleted
+                                        ? AppTheme.textMuted
                                         : AppTheme.textSecondary,
                                   ),
                                   const SizedBox(width: 4),
                                   Flexible(
                                     child: Text(
-                                      collegeName.length > 15 
+                                      collegeName.length > 15
                                           ? '${collegeName.substring(0, 15)}...'
                                           : collegeName,
                                       style: GoogleFonts.poppins(
                                         fontSize: 12,
-                                        color: isCompleted 
-                                            ? AppTheme.textMuted 
+                                        color: isCompleted
+                                            ? AppTheme.textMuted
                                             : AppTheme.textSecondary,
                                       ),
                                       overflow: TextOverflow.ellipsis,
@@ -422,17 +429,17 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             ),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 6),
-                      
+
                       // Time
                       Row(
                         children: [
                           Icon(
                             Icons.access_time,
                             size: 14,
-                            color: isCompleted 
-                                ? AppTheme.textMuted 
+                            color: isCompleted
+                                ? AppTheme.textMuted
                                 : AppTheme.textSecondary,
                           ),
                           const SizedBox(width: 4),
@@ -440,17 +447,20 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             '${DateFormat('HH:mm').format(revSlot.scheduledStartTime)} - ${DateFormat('HH:mm').format(revSlot.scheduledEndTime)}',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
-                              color: isCompleted 
-                                  ? AppTheme.textMuted 
+                              color: isCompleted
+                                  ? AppTheme.textMuted
                                   : AppTheme.textSecondary,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: isCompleted 
-                                  ? AppTheme.surfaceMedium 
+                              color: isCompleted
+                                  ? AppTheme.surfaceMedium
                                   : AppTheme.surfaceLight,
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -459,25 +469,26 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                               style: GoogleFonts.poppins(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
-                                color: isCompleted 
-                                    ? AppTheme.textMuted 
+                                color: isCompleted
+                                    ? AppTheme.textMuted
                                     : AppTheme.textSecondary,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      
+
                       // Notes if any
-                      if (revSlot.notes != null && revSlot.notes!.isNotEmpty) ...[
+                      if (revSlot.notes != null &&
+                          revSlot.notes!.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Row(
                           children: [
                             Icon(
                               Icons.notes,
                               size: 14,
-                              color: isCompleted 
-                                  ? AppTheme.textMuted 
+                              color: isCompleted
+                                  ? AppTheme.textMuted
                                   : AppTheme.textSecondary,
                             ),
                             const SizedBox(width: 4),
@@ -487,8 +498,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                 style: GoogleFonts.poppins(
                                   fontSize: 11,
                                   fontStyle: FontStyle.italic,
-                                  color: isCompleted 
-                                      ? AppTheme.textMuted 
+                                  color: isCompleted
+                                      ? AppTheme.textMuted
                                       : AppTheme.textSecondary,
                                 ),
                                 maxLines: 1,
@@ -501,15 +512,13 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     ],
                   ),
                 ),
-                
+
                 // Status icon
                 Icon(
-                  isCompleted 
-                      ? Icons.check_circle 
+                  isCompleted
+                      ? Icons.check_circle
                       : Icons.radio_button_unchecked,
-                  color: isCompleted 
-                      ? AppTheme.success 
-                      : AppTheme.textMuted,
+                  color: isCompleted ? AppTheme.success : AppTheme.textMuted,
                 ),
               ],
             ),
@@ -549,7 +558,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           children: [
             const BottomSheetHandle(),
             const SizedBox(height: 20),
-            
+
             // Revision info
             Text(
               '${revSlot.revisionType.label} - ${DateFormat('d MMM yyyy', 'fr_FR').format(revSlot.scheduledDate)}',
@@ -558,9 +567,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Actions
             _buildOptionTile(
               icon: Icons.edit_outlined,
@@ -570,7 +579,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                 _editRevision(rev, revSlot);
               },
             ),
-            
+
             if (revSlot.isCompleted)
               _buildOptionTile(
                 icon: Icons.undo,
@@ -590,7 +599,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   await _toggleCompleted(revSlot, true);
                 },
               ),
-            
+
             _buildOptionTile(
               icon: Icons.delete_outline,
               title: 'Supprimer',
@@ -600,7 +609,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                 _deleteRevision(revSlot);
               },
             ),
-            
+
             const SizedBox(height: 12),
           ],
         ),
@@ -624,9 +633,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         ),
       ),
       onTap: onTap,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 
@@ -638,17 +645,18 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       );
       return;
     }
-    
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddRevisionScreen(
+        builder: (context) => AddCalendarEntryScreen(
           itemId: widget.itemId,
           itemColleges: colleges,
+          forceEntryType: CalendarEntryType.revision,
         ),
       ),
     );
-    
+
     if (result == true) {
       _loadData();
     }
@@ -656,19 +664,19 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
   void _editRevision(Map<String, dynamic> rev, RevisionSlot revSlot) async {
     final colleges = _itemData!['colleges'] as List<Map<String, dynamic>>;
-    
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddRevisionScreen(
+        builder: (context) => AddCalendarEntryScreen(
           itemId: widget.itemId,
           itemColleges: colleges,
-          existingSlot: revSlot,
-          existingSlotData: rev,
+          existingRevision: revSlot,
+          existingRevisionData: rev,
         ),
       ),
     );
-    
+
     if (result == true) {
       _loadData();
     }
@@ -682,13 +690,15 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       ),
     );
     _loadData();
-    
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(completed 
-              ? 'Révision marquée comme complétée' 
-              : 'Révision marquée comme non complétée'),
+          content: Text(
+            completed
+                ? 'Révision marquée comme complétée'
+                : 'Révision marquée comme non complétée',
+          ),
           backgroundColor: completed ? AppTheme.success : AppTheme.info,
         ),
       );
@@ -714,11 +724,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         ],
       ),
     );
-    
+
     if (confirmed == true) {
       await _db.deleteRevisionSlot(slot.id!);
       _loadData();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
